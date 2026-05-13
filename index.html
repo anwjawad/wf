@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oncology Coordination Workflow & Responsibilities System</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            medical: {
+              blue: "#1E3A8A",    // General / Med Sec
+              teal: "#0D9488",    // Radiotherapy
+              purple: "#7E22CE",  // Breast Cancer
+              orange: "#EA580C",  // Chemotherapy
+              green: "#16A34A",   // Permits
+              red: "#DC2626",     // Rejected
+              gray: "#6B7280",    // Default
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- React and ReactDOM CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel Standalone CDN for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    /* Custom scrollbar for beautiful UI */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased overflow-hidden">
+
+  <div id="root"></div>
+
+  <!-- Main App Code -->
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // ==========================================
+    // SVG ICONS (Lucide equivalents)
+    // ==========================================
+    const ActivityIcon = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>);
+    const NetworkIcon = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>);
+    const HeartPulseIcon = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>);
+    const GitMergeIcon = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>);
+    const UsersIcon = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>);
+    const FileTextIcon = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>);
+    const SearchIcon = () => (<svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>);
+    const BellIcon = () => (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>);
+    const UserCircleIcon = () => (<svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>);
+    const HelpCircleIcon = () => (<svg className="w-5 h-5 text-medical-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>);
+    const AlertCircleIcon = () => (<svg className="w-5 h-5 text-medical-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>);
+    const CalendarIcon = () => (<svg className="w-5 h-5 text-medical-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>);
+    const StethoscopeIcon = () => (<svg className="w-5 h-5 text-medical-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"></path></svg>);
+    const MapPinIcon = () => (<svg className="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>);
+    const ClockIcon = () => (<svg className="w-5 h-5 text-medical-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>);
+    const CheckIcon = () => (<svg className="w-4 h-4 text-medical-green mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>);
+    const XIcon = () => (<svg className="w-4 h-4 text-slate-300 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>);
+    const ArrowDownIcon = () => (<svg className="w-4 h-4 text-slate-400 my-1 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>);
+
+    // ==========================================
+    // DUMMY DATA
+    // ==========================================
+    const roles = [
+      {
+        id: 'r1',
+        name: 'Medical Secretary',
+        department: 'Outpatient Clinics',
+        description: 'Initial contact point for outpatients. Manages clinic appointments and initial referral checks.',
+        responsibilities: [
+          'Give clinic appointment to patients',
+          'Check referral availability',
+          'Inform patients of Simulation appointments (after receiving list)',
+          'Coordinate inpatient communication through Inpatient Oncology Coordinator'
+        ],
+        relatedPathways: ['Master', 'General', 'Radiotherapy', 'Breast Cancer'],
+        color: 'medical-blue'
+      },
+      {
+        id: 'r2',
+        name: 'General Oncology Coordinator',
+        department: 'Oncology Coordination',
+        description: 'Handles general oncology patient pathways and overall coordination of care.',
+        responsibilities: [
+          'Follow up on missing referrals',
+          'Arrange clinic appointments and investigations',
+          'Request permits if needed',
+          'Arrange chemotherapy/OPC appointments'
+        ],
+        relatedPathways: ['General', 'Master'],
+        color: 'medical-blue'
+      },
+      {
+        id: 'r3',
+        name: 'Radiotherapy Coordinator',
+        department: 'Radiation Oncology',
+        description: 'Specialized coordinator for patients requiring radiation therapy.',
+        responsibilities: [
+          'Review radiotherapy referrals',
+          'Arrange CT, PET and clinic appointments',
+          'Manage Presimulation meeting lists',
+          'Book concomitant chemotherapy if needed'
+        ],
+        relatedPathways: ['Radiotherapy', 'Master'],
+        color: 'medical-teal'
+      },
+      {
+        id: 'r4',
+        name: 'Breast Cancer Coordinator',
+        department: 'Breast MDT',
+        description: 'Dedicated coordinator for breast cancer patients coming from MDT or clinics.',
+        responsibilities: [
+          'Fill patient data from MDT',
+          'Arrange CT, US, PET',
+          'Follow up on referrals and permits',
+          'Inform patient whenever any appointment or permit is ready'
+        ],
+        relatedPathways: ['Breast Cancer', 'Master'],
+        color: 'medical-purple'
+      },
+      {
+        id: 'r5',
+        name: 'Inpatient Oncology Coordinator',
+        department: 'Inpatient Ward',
+        description: 'Coordinates care and appointments for admitted patients.',
+        responsibilities: [
+          'Inform inpatient/ward of appointments',
+          'Support internal coordination',
+          'Support transport coordination'
+        ],
+        relatedPathways: ['Inpatient', 'Master', 'Radiotherapy'],
+        color: 'medical-blue'
+      },
+      {
+        id: 'r6',
+        name: 'Chemotherapy / OPC',
+        department: 'Outpatient Chemotherapy',
+        description: 'Manages the booking and delivery of systemic treatments.',
+        responsibilities: [
+          'Confirm chemotherapy booking',
+          'Provide chemotherapy/OPC services',
+          'Support appointment coordination'
+        ],
+        relatedPathways: ['Chemotherapy', 'Master', 'General', 'Radiotherapy'],
+        color: 'medical-orange'
+      },
+      {
+        id: 'r7',
+        name: 'Permit Department',
+        department: 'Administration',
+        description: 'Handles the requests, approvals, and rejections of financial/treatment permits.',
+        responsibilities: [
+          'Process permit requests',
+          'Communicate approval or rejection status',
+          'Contact patient to explain rejection reasons'
+        ],
+        relatedPathways: ['Permit', 'Master', 'General', 'Radiotherapy', 'Breast Cancer'],
+        color: 'medical-green'
+      }
+    ];
+
+    const responsibilityMatrix = [
+      { role: 'Medical Secretary', informsPatient: ['Clinic Appointments', 'Simulation Appointments (post-list)'], booksAppointments: ['Initial Clinic'], followsReferral: false, requestsPermit: false },
+      { role: 'General Oncology Coordinator', informsPatient: ['General Follow-ups', 'Missing Referral Status'], booksAppointments: ['Clinic Follow-ups', 'Investigations', 'Chemo/OPC'], followsReferral: true, requestsPermit: true },
+      { role: 'Radiotherapy Coordinator', informsPatient: ['CT', 'PET', 'RT Clinic', 'Pre-simulation steps'], booksAppointments: ['CT', 'PET', 'Concomitant Chemo'], followsReferral: true, requestsPermit: true },
+      { role: 'Breast Cancer Coordinator', informsPatient: ['CT', 'US', 'PET', 'Permit updates', 'Referral updates', 'Breast appointments'], booksAppointments: ['CT', 'US', 'PET', 'Surgery consults'], followsReferral: true, requestsPermit: true },
+      { role: 'Inpatient Oncology Coordinator', informsPatient: ['Ward Staff', 'Admitted Patients'], booksAppointments: [], followsReferral: false, requestsPermit: false },
+      { role: 'Chemotherapy / OPC', informsPatient: ['Chemo Booking Confirmations'], booksAppointments: ['Chemo Sessions'], followsReferral: false, requestsPermit: false },
+      { role: 'Permit Department', informsPatient: ['Permit Approvals', 'Permit Rejection Reasons'], booksAppointments: [], followsReferral: false, requestsPermit: true }
+    ];
+
+    const workflows = [
+      {
+        id: 'master',
+        title: 'Master Oncology Coordination Pathway',
+        subtitle: 'High-level patient journey from entry to treatment',
+        patientType: 'Both',
+        coordinatorRole: 'General Oncology Coordinator',
+        description: 'The main decision tree for all oncology patients entering the hospital system.',
+        colorClass: 'border-medical-blue',
+        badgeColor: 'bg-medical-blue/10 text-medical-blue',
+        steps: [
+          { id: 'start1', title: 'Patient Entry Points', description: 'Ramallah/Hebron/Jerusalem Clinics, MDT, Specialist Emails, Inpatient Admission', role: 'Patient / MDT', dept: 'External', type: 'start' },
+          { id: 'dec1', title: 'Patient Type?', description: 'Determine if the patient flow is Outpatient or Inpatient', role: 'Medical Secretary', dept: 'Intake', type: 'decision' },
+          
+          // Inpatient branch
+          { id: 'inp1', title: 'Inpatient Communication', description: 'Medical Secretary contacts Inpatient Oncology Coordinator', role: 'Medical Secretary', dept: 'Outpatient Clinics', type: 'action', branch: 'Inpatient Flow' },
+          { id: 'inp2', title: 'Inform Patient / Ward', description: 'Coordinator informs patient and inpatient ward staff', role: 'Inpatient Oncology Coordinator', dept: 'Inpatient Ward', type: 'notification', branch: 'Inpatient Flow' },
+          { id: 'inp3', title: 'Internal Coordination', description: 'Transport and procedure logistics handled internally', role: 'Inpatient Oncology Coordinator', dept: 'Logistics', type: 'action', branch: 'Inpatient Flow' },
+          
+          // Outpatient branch
+          { id: 'out1', title: 'Clinic Appointment Booking', description: 'Medical Secretary gives initial clinic appointment', role: 'Medical Secretary', dept: 'Outpatient Clinics', type: 'appointment', branch: 'Outpatient Flow' },
+          { id: 'out2', title: 'Clinic Attendance', description: 'Patient attends clinic and shows physical/electronic referral', role: 'Patient', dept: 'Clinic', type: 'action', branch: 'Outpatient Flow' },
+          { id: 'dec2', title: 'Referral Available?', description: 'Verify if a valid treatment referral is present', role: 'Medical Secretary', dept: 'Clinic', type: 'decision', branch: 'Outpatient Flow' },
+          
+          // No referral
+          { id: 'dec3', title: 'Reached Coordinator?', description: 'Scenario A (Reached) vs Scenario B (Did not reach)', role: 'Patient', dept: 'Clinic', type: 'decision', branch: 'Missing Referral' },
+          { id: 'out3a', title: 'Coordinator Follows Up', description: 'Coordinator tracks referral until officially issued', role: 'General Oncology Coordinator', dept: 'Coordination', type: 'action', branch: 'Missing Referral' },
+          
+          // Referral Available
+          { id: 'out4', title: 'Assign Responsible Coordinator', align: 'main', description: 'Radiotherapy, Breast Cancer, Clinic Nurse, or General Coordinator', role: 'General Oncology Coordinator', dept: 'Coordination', type: 'action', branch: 'Referral Cleared' },
+          { id: 'dec4', title: 'Need Permit?', description: 'Determine if treatment requires official permit approval', role: 'Coordinator', dept: 'Coordination', type: 'decision', branch: 'Referral Cleared' },
+          
+          // Permit branch
+          { id: 'perm1', title: 'Submit Permit Request', description: 'Coordinator sends documentation to Permit Department', role: 'Coordinator', dept: 'Coordination', type: 'permit', branch: 'Permit Process' },
+          { id: 'perm2', title: 'Patient Checks APP', description: 'Patient tracks permit approval status directly on application', role: 'Patient', dept: 'External', type: 'action', branch: 'Permit Process' },
+          { id: 'dec5', title: 'Permit Approved?', description: 'Permit Department issues Approval or Rejection', role: 'Permit Department', dept: 'Administration', type: 'decision', branch: 'Permit Process' },
+          { id: 'perm3', title: 'Rejection Notification', description: 'Permit Dept contacts patient to explain rejection reasons. Returns to MS/Coordinator follow-up.', role: 'Permit Department', dept: 'Administration', type: 'notification', branch: 'Permit Rejected' },
+          
+          // Treatment branch
+          { id: 'treat1', title: 'Continue to Treatment Pathways', description: 'Proceed to specialized Radiotherapy, Chemotherapy, or Surgery schedules', role: 'Specialized Departments', dept: 'Treatment', type: 'treatment', branch: 'Cleared for Care' }
+        ]
+      },
+      {
+        id: 'general',
+        title: 'General Oncology Coordinator Pathway',
+        subtitle: 'Core operational flow for general oncology cases',
+        patientType: 'Outpatient / Inpatient',
+        coordinatorRole: 'General Oncology Coordinator',
+        description: 'Comprehensive tracking of routine investigations, chemo bookings, and permit coordination.',
+        colorClass: 'border-medical-blue',
+        badgeColor: 'bg-medical-blue/10 text-medical-blue',
+        steps: [
+          { id: 'g1', title: 'Patient Intake', description: 'Entry via Clinic, Specialist Referral, or Inpatient Admission', role: 'Medical Secretary', dept: 'Intake', type: 'start' },
+          { id: 'g2', title: 'Referral Verification', description: 'Check if referral is available. Follow up if missing.', role: 'General Oncology Coordinator', dept: 'Coordination', type: 'action' },
+          { id: 'g3', title: 'Review Case Needs', description: 'Evaluate necessary clinical services and multidisciplinary consults', role: 'General Oncology Coordinator', dept: 'Coordination', type: 'action' },
+          { id: 'g4', title: 'Arrange Investigations', description: 'Book laboratory tests and routine imaging', role: 'General Oncology Coordinator', dept: 'Coordination', type: 'appointment' },
+          { id: 'g5', title: 'Coordinate Chemotherapy', description: 'Collect data, contact OPC Dept, book session, and inform patient', role: 'General Oncology Coordinator', dept: 'Chemotherapy', type: 'action' },
+          { id: 'g6', title: 'Permit Handling', description: 'Submit permit request if necessary and track approval status', role: 'General Oncology Coordinator', dept: 'Permit Dept', type: 'permit' },
+          { id: 'g7', title: 'Treatment Delivery', description: 'Patient attends chemotherapy or general oncology treatments', role: 'Treating Team', dept: 'Oncology Clinic', type: 'treatment' }
+        ]
+      },
+      {
+        id: 'radiotherapy',
+        title: 'Radiotherapy Coordinator Pathway',
+        subtitle: 'Dedicated radiation oncology scheduling protocol',
+        patientType: 'Outpatient',
+        coordinatorRole: 'Radiotherapy Coordinator',
+        description: 'Pre-simulation prep, multidisciplinary alignment, and concomitant chemo bookings.',
+        colorClass: 'border-medical-teal',
+        badgeColor: 'bg-medical-teal/10 text-medical-teal',
+        steps: [
+          { id: 'rt1', title: 'Clinic Entry', description: 'Medical Secretary gives appointment to Radiation Oncology clinic', role: 'Medical Secretary', dept: 'Outpatient Clinics', type: 'start' },
+          { id: 'rt2', title: 'Referral Clearance', description: 'RT Coordinator reviews referral status and resolves pending items', role: 'Radiotherapy Coordinator', dept: 'Radiation Oncology', type: 'action' },
+          { id: 'rt3', title: 'Arrange Staging & Scans', description: 'Book CT, PET scans, and required sub-specialty clinics', role: 'Radiotherapy Coordinator', dept: 'Imaging', type: 'appointment' },
+          { id: 'rt4', title: 'Patient Notification', description: 'RT Coordinator informs patient of booked preliminary appointments', role: 'Radiotherapy Coordinator', dept: 'Coordination', type: 'notification' },
+          { id: 'rt5', title: 'Presimulation Meeting List', description: 'Compile patient lists and send to Medical Secretary for scheduling', role: 'Radiotherapy Coordinator', dept: 'Coordination', type: 'action' },
+          { id: 'rt6', title: 'Simulation Booking', description: 'Medical Secretary informs patient of Simulation date and time', role: 'Medical Secretary', dept: 'Outpatient Clinics', type: 'notification' },
+          { id: 'rt7', title: 'Simulation Execution', description: 'Patient completes simulation process successfully', role: 'Radiation Therapist', dept: 'Radiation Oncology', type: 'treatment' },
+          { id: 'dec_rt', title: 'Concomitant Chemo?', description: 'Determine if patient needs concurrent systemic therapy', role: 'Radiation Oncologist', dept: 'Radiation Oncology', type: 'decision' },
+          { id: 'rt8', title: 'Book OPC Chemo', description: 'RT Coordinator books chemotherapy with OPC Dept and informs patient', role: 'Radiotherapy Coordinator', dept: 'Chemo / OPC', type: 'appointment' },
+          { id: 'rt9', title: 'Initiate RT Treatment', description: 'Commence standard radiotherapy fractionation schedules', role: 'Treating Team', dept: 'Radiation Oncology', type: 'treatment' }
+        ]
+      },
+      {
+        id: 'breast-cancer',
+        title: 'Breast Cancer Coordinator Pathway',
+        subtitle: 'Fast-track staging and multi-department coordination',
+        patientType: 'MDT / Outpatient',
+        coordinatorRole: 'Breast Cancer Coordinator',
+        description: 'Rapid diagnostic scheduling, continuous patient updates, and transition to treatment.',
+        colorClass: 'border-medical-purple',
+        badgeColor: 'bg-medical-purple/10 text-medical-purple',
+        steps: [
+          { id: 'bc1', title: 'Case Intake', description: 'Receive case from Breast MDT, Outpatient Clinic, or Specialist Emails', role: 'Breast Cancer Coordinator', dept: 'Breast MDT', type: 'start' },
+          { id: 'bc2', title: 'Data Capture', description: 'Register name, MRN, phone, diagnosis, physician, and patient type', role: 'Breast Cancer Coordinator', dept: 'Breast MDT', type: 'action' },
+          { id: 'bc3', title: 'Arrange Fast-Track Scans', description: 'Book critical CT, Breast Ultrasound (US), and PET scans', role: 'Breast Cancer Coordinator', dept: 'Imaging', type: 'appointment' },
+          { id: 'bc4', title: 'Referral & Permit Tracking', description: 'Follow up referrals and ensure valid treatment permits are secured', role: 'Breast Cancer Coordinator', dept: 'Permit Dept', type: 'permit' },
+          { id: 'bc5', title: 'Proactive Patient Updates', description: 'Inform patient immediately as each scan/permit milestone clears', role: 'Breast Cancer Coordinator', dept: 'Coordination', type: 'notification' },
+          { id: 'bc6', title: 'Transition to Treatment', description: 'Handover to Surgery, Chemotherapy, or Radiotherapy units', role: 'Multidisciplinary Team', dept: 'Specialized Units', type: 'treatment' }
+        ]
+      },
+      {
+        id: 'inpatient',
+        title: 'Inpatient Oncology Coordinator Pathway',
+        subtitle: 'Ward coordination and logistics support',
+        patientType: 'Inpatient',
+        coordinatorRole: 'Inpatient Oncology Coordinator',
+        description: 'Internal transport tracking and ward alignment for scheduled procedures.',
+        colorClass: 'border-medical-blue',
+        badgeColor: 'bg-medical-blue/10 text-medical-blue',
+        steps: [
+          { id: 'inp_s1', title: 'Admission Notice', description: 'Medical Secretary or Ward alerts Coordinator of required external procedures', role: 'Medical Secretary', dept: 'Outpatient Clinics', type: 'start' },
+          { id: 'inp_s2', title: 'Ward Communication', description: 'Inform inpatient ward charge nurse of procedure timings', role: 'Inpatient Oncology Coordinator', dept: 'Inpatient Ward', type: 'notification' },
+          { id: 'inp_s3', title: 'Transport Logistics', description: 'Arrange internal stretcher/wheelchair transport teams', role: 'Inpatient Oncology Coordinator', dept: 'Logistics', type: 'action' },
+          { id: 'inp_s4', title: 'Procedure Completion', description: 'Patient safely returned to ward post-treatment', role: 'Treating Team', dept: 'Hospital Clinics', type: 'treatment' }
+        ]
+      },
+      {
+        id: 'chemotherapy',
+        title: 'Chemotherapy / OPC Department Pathway',
+        subtitle: 'Systemic treatment booking and delivery',
+        patientType: 'Outpatient / Inpatient',
+        coordinatorRole: 'Chemotherapy / OPC',
+        description: 'Direct collaboration with primary coordinators to secure chair times.',
+        colorClass: 'border-medical-orange',
+        badgeColor: 'bg-medical-orange/10 text-medical-orange',
+        steps: [
+          { id: 'c1', title: 'Chemo Request Received', description: 'Coordinator submits comprehensive patient parameters', role: 'Primary Coordinator', dept: 'Coordination', type: 'start' },
+          { id: 'c2', title: 'Chair Confirmation', description: 'OPC Department confirms scheduling capacity and locks booking', role: 'Chemotherapy / OPC', dept: 'OPC Desk', type: 'appointment' },
+          { id: 'c3', title: 'Patient Notification', description: 'Primary coordinator informs patient of exact infusion timing', role: 'Primary Coordinator', dept: 'Coordination', type: 'notification' },
+          { id: 'c4', title: 'Infusion Administration', description: 'Delivery of targeted chemotherapy regimens safely', role: 'Oncology Nurses', dept: 'Outpatient Chemo', type: 'treatment' }
+        ]
+      },
+      {
+        id: 'permit',
+        title: 'Permit Department Pathway',
+        subtitle: 'Financial coverage and approval operations',
+        patientType: 'Both',
+        coordinatorRole: 'Permit Department',
+        description: 'Managing coverage applications, tracking outcomes, and communicating rejections.',
+        colorClass: 'border-medical-green',
+        badgeColor: 'bg-medical-green/10 text-medical-green',
+        steps: [
+          { id: 'p1', title: 'Application Intake', description: 'Receive medical reports and requests from primary coordinators', role: 'Permit Department', dept: 'Administration', type: 'start' },
+          { id: 'p2', title: 'Coverage Processing', description: 'Submit applications to relevant funding/permit agencies', role: 'Permit Department', dept: 'Administration', type: 'action' },
+          { id: 'dec_p', title: 'Agency Outcome?', description: 'Evaluate if coverage is granted or rejected', role: 'External Agency', dept: 'Government/Insurance', type: 'decision' },
+          { id: 'p3_app', title: 'Log Approval', description: 'Notify coordinator and update patient profile application', role: 'Permit Department', dept: 'Administration', type: 'action' },
+          { id: 'p3_rej', title: 'Patient Rejection Support', description: 'Contact patient directly to thoroughly explain rejection rationale', role: 'Permit Department', dept: 'Administration', type: 'notification' },
+          { id: 'p4', title: 'Resolution Follow-up', description: 'Return case to Medical Secretary for alternate booking scheduling', role: 'Medical Secretary', dept: 'Outpatient Clinics', type: 'action' }
+        ]
+      }
+    ];
+
+    // ==========================================
+    // COMPONENTS
+    // ==========================================
+
+    // Sidebar
+    const Sidebar = ({ activeTab, setActiveTab }) => {
+      const items = [
+        { id: 'dashboard', name: 'Dashboard', icon: ActivityIcon },
+        { id: 'master', name: 'Master Workflow', icon: NetworkIcon },
+        { id: 'general', name: 'General Oncology', icon: ActivityIcon },
+        { id: 'radiotherapy', name: 'Radiotherapy Pathway', icon: HeartPulseIcon },
+        { id: 'breast-cancer', name: 'Breast Cancer Pathway', icon: ActivityIcon },
+        { id: 'inpatient', name: 'Inpatient Pathway', icon: ActivityIcon },
+        { id: 'chemotherapy', name: 'Chemotherapy / OPC', icon: ActivityIcon },
+        { id: 'permit', name: 'Permit Department', icon: FileTextIcon },
+        { id: 'matrix', name: 'Responsibility Matrix', icon: GitMergeIcon },
+        { id: 'roles', name: 'Roles & Guidelines', icon: UsersIcon },
+        { id: 'sop', name: 'SOP Documentation', icon: FileTextIcon },
+      ];
+
+      return (
+        <div className="w-64 bg-white border-r h-full flex flex-col shadow-sm flex-shrink-0">
+          <div className="p-6 border-b">
+            <div className="flex items-center gap-2 text-medical-blue font-bold text-xl tracking-tight">
+              <div className="p-1.5 bg-medical-blue/10 rounded-lg text-medical-blue">
+                <ActivityIcon />
+              </div>
+              <span>OncoFlow</span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1 font-medium">Workflow & Responsibilities</p>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
+            {items.map((item) => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
+                    isActive 
+                      ? "bg-medical-blue/10 text-medical-blue font-semibold" 
+                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  }`}
+                >
+                  <span className={isActive ? "text-medical-blue" : "text-slate-400"}>
+                    {item.icon()}
+                  </span>
+                  <span className="truncate">{item.name}</span>
+                </button>
+              );
+            })}
+          </div>
+          
+          <div className="p-4 border-t bg-slate-50/50 text-[11px] text-slate-400 text-center font-medium">
+            Hospital Internal Use Only
+          </div>
+        </div>
+      );
+    };
+
+    // Header
+    const Header = ({ searchQuery, setSearchQuery }) => (
+      <header className="h-16 bg-white border-b flex items-center justify-between px-6 shadow-sm z-10 flex-shrink-0">
+        <div className="flex-1 flex items-center">
+          <div className="relative w-96">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <SearchIcon />
+            </div>
+            <input 
+              type="text" 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search steps, roles, departments..." 
+              className="block w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-medical-blue focus:border-medical-blue transition-colors"
+            />
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <span className="text-xs font-semibold px-2.5 py-1 bg-medical-green/10 text-medical-green rounded-full border border-medical-green/20">
+            Offline Mode Ready
+          </span>
+          <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
+            <div className="text-right">
+              <div className="text-sm font-bold text-slate-800 leading-tight">Dr. Sarah Admin</div>
+              <div className="text-[11px] text-slate-400 font-medium">Oncology Director</div>
+            </div>
+            <UserCircleIcon />
+          </div>
+        </div>
+      </header>
+    );
+
+    // Dashboard View
+    const DashboardView = ({ setActiveTab }) => {
+      const totalSteps = useMemo(() => workflows.reduce((acc, wf) => acc + wf.steps.length, 0), []);
+      
+      return (
+        <div className="space-y-6 overflow-y-auto h-full pr-2">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Coordination Dashboard</h1>
+            <p className="text-slate-500 mt-1 text-sm font-medium">Interactive training and standard operating visualization center.</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="p-6 rounded-xl border bg-white shadow-sm hover:shadow transition-shadow border-l-4 border-l-medical-blue">
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Pathways</div>
+              <div className="text-3xl font-extrabold text-slate-800 mt-2">{workflows.length}</div>
+              <div className="text-xs text-medical-blue font-semibold mt-1">Mapped internal tracks</div>
+            </div>
+            
+            <div className="p-6 rounded-xl border bg-white shadow-sm hover:shadow transition-shadow border-l-4 border-l-medical-purple">
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Roles & Depts</div>
+              <div className="text-3xl font-extrabold text-slate-800 mt-2">{roles.length}</div>
+              <div className="text-xs text-medical-purple font-semibold mt-1">Coordinating groups</div>
+            </div>
+
+            <div className="p-6 rounded-xl border bg-white shadow-sm hover:shadow transition-shadow border-l-4 border-l-medical-teal">
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Process Nodes</div>
+              <div className="text-3xl font-extrabold text-slate-800 mt-2">{totalSteps}</div>
+              <div className="text-xs text-medical-teal font-semibold mt-1">Action & Decision logic</div>
+            </div>
+
+            <div className="p-6 rounded-xl border bg-white shadow-sm hover:shadow transition-shadow border-l-4 border-l-medical-orange">
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Permit Actions</div>
+              <div className="text-3xl font-extrabold text-slate-800 mt-2">Critical</div>
+              <div className="text-xs text-medical-orange font-semibold mt-1">Direct Patient Outreach</div>
+            </div>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="p-6 rounded-xl border bg-white shadow-sm flex flex-col justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">Explore Workflows</h3>
+                <p className="text-xs text-slate-500 mt-1">Deep-dive into verified decision matrices and staff guidelines.</p>
+                
+                <div className="mt-4 space-y-2">
+                  <button onClick={() => setActiveTab('master')} className="w-full p-3 bg-slate-50 hover:bg-medical-blue/5 rounded-lg border border-slate-100 flex items-center justify-between text-sm font-semibold text-slate-700 transition-colors">
+                    <span className="flex items-center gap-2">
+                      <span className="text-medical-blue"><NetworkIcon /></span>
+                      Master Oncology Journey
+                    </span>
+                    <span className="text-xs text-slate-400">View flow &rarr;</span>
+                  </button>
+                  <button onClick={() => setActiveTab('radiotherapy')} className="w-full p-3 bg-slate-50 hover:bg-medical-teal/5 rounded-lg border border-slate-100 flex items-center justify-between text-sm font-semibold text-slate-700 transition-colors">
+                    <span className="flex items-center gap-2">
+                      <span className="text-medical-teal"><HeartPulseIcon /></span>
+                      Radiotherapy Protocol
+                    </span>
+                    <span className="text-xs text-slate-400">View flow &rarr;</span>
+                  </button>
+                  <button onClick={() => setActiveTab('breast-cancer')} className="w-full p-3 bg-slate-50 hover:bg-medical-purple/5 rounded-lg border border-slate-100 flex items-center justify-between text-sm font-semibold text-slate-700 transition-colors">
+                    <span className="flex items-center gap-2">
+                      <span className="text-medical-purple"><ActivityIcon /></span>
+                      Breast Cancer Fast-Track
+                    </span>
+                    <span className="text-xs text-slate-400">View flow &rarr;</span>
+                  </button>
+                </div>
+              </div>
+              
+              <button onClick={() => setActiveTab('matrix')} className="mt-6 w-full py-2.5 bg-medical-blue text-white rounded-lg text-sm font-bold shadow hover:bg-medical-blue/90 transition-colors">
+                Open Patient Notification Matrix
+              </button>
+            </div>
+
+            <div className="p-6 rounded-xl border bg-white shadow-sm">
+              <h3 className="text-lg font-bold text-slate-800">Important Pathway Notes</h3>
+              <p className="text-xs text-slate-500 mt-1">System operational constraints and guidelines.</p>
+              
+              <div className="mt-4 space-y-3">
+                <div className="p-3 bg-medical-red/5 border border-medical-red/10 rounded-lg">
+                  <div className="text-xs font-bold text-medical-red">Permit Rejections Protocol</div>
+                  <div className="text-xs text-slate-600 mt-1">If treatment approval is denied, the Permit Department has full responsibility to contact the patient directly to thoroughly explain rejection reasons.</div>
+                </div>
+
+                <div className="p-3 bg-medical-teal/5 border border-medical-teal/10 rounded-lg">
+                  <div className="text-xs font-bold text-medical-teal">Pre-Simulation Meetings</div>
+                  <div className="text-xs text-slate-600 mt-1">Radiotherapy coordinators collect candidates into pre-simulation meeting lists, which are transmitted to Medical Secretaries for rapid scheduling.</div>
+                </div>
+
+                <div className="p-3 bg-medical-blue/5 border border-medical-blue/10 rounded-lg">
+                  <div className="text-xs font-bold text-medical-blue">Missing Referrals Handling</div>
+                  <div className="text-xs text-slate-600 mt-1">If a patient arrives without active referral coverage but reaches a specialized coordinator, that coordinator assumes follow-up responsibility until official issuance.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Native Premium Flowchart View
+    const WorkflowView = ({ workflow, searchQuery }) => {
+      const [expandedStep, setExpandedStep] = useState(null);
+
+      const filteredSteps = useMemo(() => {
+        if (!searchQuery) return workflow.steps;
+        const q = searchQuery.toLowerCase();
+        return workflow.steps.filter(s => 
+          s.title.toLowerCase().includes(q) || 
+          s.description.toLowerCase().includes(q) ||
+          s.role.toLowerCase().includes(q) ||
+          s.dept.toLowerCase().includes(q)
+        );
+      }, [workflow, searchQuery]);
+
+      const getStepClass = (type) => {
+        switch(type) {
+          case 'start': return 'border-slate-800 bg-slate-50';
+          case 'decision': return 'border-medical-orange bg-orange-50/20';
+          case 'notification': return 'border-medical-teal bg-teal-50/20';
+          case 'permit': return 'border-medical-green bg-green-50/20';
+          case 'appointment': return 'border-medical-blue bg-blue-50/20';
+          case 'treatment': return 'border-medical-purple bg-purple-50/20';
+          default: return 'border-slate-200 bg-white';
+        }
+      };
+
+      const getTypeBadge = (type) => {
+        switch(type) {
+          case 'start': return <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-white font-bold">Entry Point</span>;
+          case 'decision': return <span className="text-[10px] px-1.5 py-0.5 rounded bg-medical-orange text-white font-bold">Decision</span>;
+          case 'notification': return <span className="text-[10px] px-1.5 py-0.5 rounded bg-medical-teal text-white font-bold">Notify Patient</span>;
+          case 'permit': return <span className="text-[10px] px-1.5 py-0.5 rounded bg-medical-green text-white font-bold">Permit Action</span>;
+          case 'appointment': return <span className="text-[10px] px-1.5 py-0.5 rounded bg-medical-blue text-white font-bold">Appointment</span>;
+          case 'treatment': return <span className="text-[10px] px-1.5 py-0.5 rounded bg-medical-purple text-white font-bold">Clinical Care</span>;
+          default: return <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-bold">Process</span>;
+        }
+      };
+
+      return (
+        <div className="space-y-6 h-full flex flex-col overflow-y-auto pr-2 pb-12">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">{workflow.title}</h1>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full ${workflow.badgeColor}`}>
+                {workflow.coordinatorRole}
+              </span>
+            </div>
+            <p className="text-slate-500 mt-1 text-sm font-medium">{workflow.subtitle}</p>
+          </div>
+
+          <div className="p-4 bg-white rounded-xl border shadow-sm">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Pathway Scope</h4>
+            <p className="text-sm text-slate-700">{workflow.description}</p>
+            <div className="mt-3 flex items-center gap-4 text-xs font-semibold text-slate-500">
+              <span>Patient Cohort: <strong className="text-slate-800">{workflow.patientType}</strong></span>
+              <span>&bull;</span>
+              <span>Total Operational Milestones: <strong className="text-slate-800">{workflow.steps.length}</strong></span>
+            </div>
+          </div>
+
+          {/* Flowchart Diagram UI */}
+          <div className="p-6 bg-slate-50 rounded-xl border shadow-inner">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-6 text-center">Interactive Visual Flowchart</h4>
+            
+            <div className="max-w-2xl mx-auto space-y-3">
+              {filteredSteps.map((step, idx) => {
+                const isExpanded = expandedStep === step.id;
+                const hasNext = idx < filteredSteps.length - 1;
+                
+                return (
+                  <div key={step.id} className="relative">
+                    {/* Node Card */}
+                    <div 
+                      onClick={() => setExpandedStep(isExpanded ? null : step.id)}
+                      className={`p-4 rounded-xl border-2 shadow-sm transition-all cursor-pointer ${getStepClass(step.type)} hover:shadow-md`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            {getTypeBadge(step.type)}
+                            {step.branch && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold border border-slate-200">
+                                {step.branch}
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="text-base font-bold text-slate-800 mt-1.5 leading-snug">{step.title}</h3>
+                          <p className="text-xs text-slate-600 mt-1 font-medium">{step.description}</p>
+                        </div>
+                        
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-[10px] font-bold text-slate-400 uppercase">Responsible</div>
+                          <div className="text-xs font-bold text-medical-blue mt-0.5">{step.role}</div>
+                          <div className="text-[10px] font-semibold text-slate-500 mt-0.5">{step.dept}</div>
+                        </div>
+                      </div>
+
+                      {/* Expandable Meta details */}
+                      {isExpanded && (
+                        <div className="mt-4 pt-3 border-t border-slate-200/60 text-xs text-slate-700 space-y-2 animate-fadeIn">
+                          <div><strong className="text-slate-400 uppercase text-[9px] block">Standard Action:</strong> Complete form fields, arrange scans, or send notifications directly.</div>
+                          <div><strong className="text-slate-400 uppercase text-[9px] block">Escalation protocol:</strong> Immediately contact department head if authorization delays exceed standard timeframes.</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Connecting Arrow */}
+                    {hasNext && (
+                      <div className="flex justify-center py-1">
+                        <div className="w-0.5 h-6 bg-slate-300 relative">
+                          <div className="absolute bottom-0 left-[-3.5px] w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-400"></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Responsibility Matrix View
+    const MatrixView = ({ searchQuery }) => {
+      const filteredMatrix = useMemo(() => {
+        if (!searchQuery) return responsibilityMatrix;
+        const q = searchQuery.toLowerCase();
+        return responsibilityMatrix.filter(m => m.role.toLowerCase().includes(q));
+      }, [searchQuery]);
+
+      return (
+        <div className="space-y-6 h-full flex flex-col overflow-y-auto pr-2 pb-12">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Patient Notification Responsibilities</h1>
+            <p className="text-slate-500 mt-1 text-sm font-medium">Clear cross-functional matrix showing outreach ownership and booking execution.</p>
+          </div>
+
+          <div className="border rounded-xl bg-white shadow-sm overflow-hidden">
+            <div className="p-4 bg-slate-50 border-b flex items-center justify-between">
+              <h3 className="font-bold text-sm text-slate-700">Role-Based Matrix Actions</h3>
+              <span className="text-xs text-slate-500 font-semibold">Verified SOP Compliance Grid</span>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b bg-slate-50/50 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="p-4 w-64">Hospital Entity</th>
+                    <th className="p-4">Direct Patient Notifications</th>
+                    <th className="p-4">Appointment Ownership</th>
+                    <th className="p-4 text-center w-32">Tracks Referral</th>
+                    <th className="p-4 text-center w-32">Requests Permit</th>
+                  </tr>
+                </thead>
+                <tbody className="text-xs text-slate-700 divide-y divide-slate-100">
+                  {filteredMatrix.map((m) => (
+                    <tr key={m.role} className="hover:bg-slate-50/40 transition-colors">
+                      <td className="p-4 font-bold text-slate-900">{m.role}</td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-1">
+                          {m.informsPatient.map((item, i) => (
+                            <span key={i} className="px-2 py-0.5 bg-medical-teal/10 text-medical-teal rounded font-semibold border border-medical-teal/20">
+                              {item}
+                            </span>
+                          ))}
+                          {m.informsPatient.length === 0 && <span className="text-slate-300 italic font-medium">None</span>}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap gap-1">
+                          {m.booksAppointments.map((item, i) => (
+                            <span key={i} className="px-2 py-0.5 bg-medical-blue/10 text-medical-blue rounded font-semibold border border-medical-blue/20">
+                              {item}
+                            </span>
+                          ))}
+                          {m.booksAppointments.length === 0 && <span className="text-slate-300 italic font-medium">None</span>}
+                        </div>
+                      </td>
+                      <td className="p-4 text-center">
+                        {m.followsReferral ? <CheckIcon /> : <XIcon />}
+                      </td>
+                      <td className="p-4 text-center">
+                        {m.requestsPermit ? <CheckIcon /> : <XIcon />}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Roles Directory View
+    const RolesView = ({ searchQuery }) => {
+      const filteredRoles = useMemo(() => {
+        if (!searchQuery) return roles;
+        const q = searchQuery.toLowerCase();
+        return roles.filter(r => r.name.toLowerCase().includes(q) || r.department.toLowerCase().includes(q));
+      }, [searchQuery]);
+
+      return (
+        <div className="space-y-6 h-full flex flex-col overflow-y-auto pr-2 pb-12">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Roles & Clinical Responsibilities</h1>
+            <p className="text-slate-500 mt-1 text-sm font-medium">Detailed administrative profiles and protocol alignments.</p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {filteredRoles.map((role) => (
+              <div key={role.id} className="relative overflow-hidden rounded-xl border bg-white shadow-sm hover:shadow transition-all p-6 flex flex-col justify-between">
+                <div className={`absolute top-0 left-0 w-1.5 h-full bg-${role.color}`} />
+                
+                <div>
+                  <div className="flex justify-between items-start">
+                    <h3 className="font-bold text-lg text-slate-800 leading-tight">{role.name}</h3>
+                    <span className="text-slate-400"><UsersIcon /></span>
+                  </div>
+                  <div className="text-xs font-semibold text-slate-400 mt-0.5">{role.department}</div>
+                  
+                  <p className="text-xs text-slate-600 mt-3 font-medium leading-relaxed">{role.description}</p>
+                  
+                  <div className="mt-4">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Core Responsibilities</h4>
+                    <ul className="space-y-1.5 pl-3 border-l-2 border-slate-100">
+                      {role.responsibilities.map((resp, i) => (
+                        <li key={i} className="text-xs text-slate-700 font-medium leading-snug">&bull; {resp}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-3 border-t border-slate-100">
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Related Mapped Pathways</h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {role.relatedPathways.map(p => (
+                      <span key={p} className="text-[10px] px-2 py-0.5 bg-slate-50 border rounded text-slate-600 font-semibold">
+                        {p}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    // SOP Auto-Documentation View
+    const SopView = () => (
+      <div className="space-y-6 h-full flex flex-col overflow-y-auto pr-2 pb-12 max-w-4xl mx-auto w-full">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">SOP Protocol Library</h1>
+          <p className="text-slate-500 mt-1 text-sm font-medium">Standard Operating Procedures derived programmatically from live hospital workflow arrays.</p>
+        </div>
+
+        <div className="border rounded-xl bg-white shadow-sm p-8 space-y-12">
+          <div>
+            <h2 className="text-lg font-bold text-slate-800 border-b pb-2">Hospital Policy Scope</h2>
+            <p className="text-xs text-slate-600 mt-2 leading-relaxed">This compendium guides coordinators, medical secretaries, and allied health staff in managing oncology patient logistics. Adherence prevents authorization delays and optimizes multidisciplinary patient pathways.</p>
+          </div>
+
+          {workflows.map((wf, index) => (
+            <div key={wf.id} className="space-y-3 pt-6 border-t">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center">
+                  {index + 1}
+                </span>
+                <h3 className="text-base font-bold text-slate-800">{wf.title}</h3>
+              </div>
+              <p className="text-xs text-slate-500 font-medium">{wf.description}</p>
+              
+              <div className="pl-9 space-y-2 mt-3">
+                <div className="text-xs font-semibold text-slate-700">Target Cohort: <span className="font-bold text-medical-blue">{wf.patientType}</span></div>
+                
+                <div className="border rounded-lg overflow-hidden mt-3">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b font-bold text-slate-400 uppercase text-[10px]">
+                        <th className="p-2 w-10 text-center">#</th>
+                        <th className="p-2 w-48">Node Name</th>
+                        <th className="p-2">Procedural Description</th>
+                        <th className="p-2 w-40">Responsible</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {wf.steps.map((st, i) => (
+                        <tr key={st.id}>
+                          <td className="p-2 font-bold text-slate-400 text-center">{i+1}</td>
+                          <td className="p-2 font-bold text-slate-800">{st.title}</td>
+                          <td className="p-2 text-slate-600">{st.description}</td>
+                          <td className="p-2 font-semibold text-medical-blue">{st.role}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+
+    // Main App Shell
+    const App = () => {
+      const [activeTab, setActiveTab] = useState('dashboard');
+      const [searchQuery, setSearchQuery] = useState('');
+
+      // Auto-scroll to top when tab changes
+      useEffect(() => {
+        setSearchQuery('');
+      }, [activeTab]);
+
+      const renderContent = () => {
+        const wf = workflows.find(w => w.id === activeTab);
+        if (wf) {
+          return <WorkflowView workflow={wf} searchQuery={searchQuery} />;
+        }
+
+        switch (activeTab) {
+          case 'dashboard': return <DashboardView setActiveTab={setActiveTab} />;
+          case 'matrix': return <MatrixView searchQuery={searchQuery} />;
+          case 'roles': return <RolesView searchQuery={searchQuery} />;
+          case 'sop': return <SopView />;
+          default: return <DashboardView setActiveTab={setActiveTab} />;
+        }
+      };
+
+      return (
+        <div className="flex h-screen bg-slate-50 overflow-hidden">
+          <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+          
+          <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+            <Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+            
+            <main className="flex-1 overflow-hidden p-6">
+              {renderContent()}
+            </main>
+          </div>
+        </div>
+      );
+    };
+
+    // Render App
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
